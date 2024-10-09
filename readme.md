@@ -102,6 +102,13 @@ async def main():
 asyncio.run(main())
 ```
 
+## Todo
+1. make a YoutubeVideo class to retrive youtube videos [  ]
+2. make an abstract PyroClient class (for userbot interacting) [  ]
+3. add support for private calls [  ]
+4. private call handlers [  ]
+5. add documention [  ]
+
 ## Contributing
 
 We welcome contributions! If you'd like to contribute, please fork the repository and create a pull request.

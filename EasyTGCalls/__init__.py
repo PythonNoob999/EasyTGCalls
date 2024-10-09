@@ -4,7 +4,6 @@ from .types import (
     Audio,
     Media,
     VoiceMediaState,
-    Call,
     REMOVE_VIDEO_AUDIO,
     AUDIO_TO_PCM16L
 )
