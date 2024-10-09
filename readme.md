@@ -77,6 +77,31 @@ async def main():
 asyncio.run(main())
 ```
 
+#### playing a youtube video (yt-dlp required)
+
+```python
+from EasyTGCalls import Caller, youtube_video
+from pyrogram import Client
+import asyncio
+
+async def main():
+    chat_id = -1002416874723
+    app = Client(":memory:", ...)
+    client = Caller(app)
+    video = await youtube_video("https://www.youtube.com/watch?v=xvFZjo5PgG0")
+
+    # join & play a youtube video
+    await client.join_call(
+        chat_id=chat_id,
+        media=video
+    )
+
+    # calls pyrogram idle
+    await client.run()
+
+asyncio.run(main())
+```
+
 ## Contributing
 
 We welcome contributions! If you'd like to contribute, please fork the repository and create a pull request.

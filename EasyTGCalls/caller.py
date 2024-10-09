@@ -1,17 +1,19 @@
-from ntgcalls import NTgCalls, MediaDescription
-from pyrogram import Client, idle, errors
+from pyrogram import Client, idle
 from pyrogram.raw.functions.channels import GetFullChannel
-from pyrogram.raw.functions.phone import JoinGroupCall
-from pyrogram.raw.types import UpdateGroupCallConnection, Updates, DataJSON, InputChannel
+from pyrogram.raw.functions.phone import JoinGroupCall, LeaveGroupCall, GetGroupCall
+from pyrogram.raw.types import UpdateGroupCallConnection, Updates, DataJSON, GroupCall
+from ntgcalls import NTgCalls, MediaDescription
 from typing import Union
 from EasyTGCalls.types import Media
+from EasyTGCalls.stream_methods import StreamMethods
 
-class Caller:
+class Caller(StreamMethods):
     def __init__(
         self: "Caller",
-        pyro_client: Client
+        pyro_client: Client,
+        wrtc: NTgCalls = None
     ):
-        self.wrtc = NTgCalls()
+        self.wrtc = wrtc or NTgCalls()
         self.client = pyro_client
 
     # raw methods
@@ -27,6 +29,7 @@ class Caller:
         )
         return params
 
+    # thanks for the examples Laky64
     async def call_data(
         self: "Caller",
         chat_id: Union[int, str],
@@ -56,6 +59,28 @@ class Caller:
                 return update.params.data
             
     # abstract methods
+
+    async def get_call(
+        self,
+        chat_id
+    ) -> Union[bool, GroupCall]:
+        # check app connection
+        if not self.client.is_connected:
+            await self.client.connect()
+
+        call = (await self.client.invoke(GetFullChannel(
+            channel=await self.client.resolve_peer(chat_id)
+        ))).full_chat.call
+
+        if not call:
+            return False
+
+        call = (await self.client.invoke(GetGroupCall(
+            call=call,
+            limit=-1
+        )))
+
+        return call
             
     async def join_call(
         self: "Caller",
@@ -81,10 +106,31 @@ class Caller:
             chat_id=chat_id,
             call_params=params,
             muted=muted,
-            video_stopped=video_stopped
+            video_stopped=video_stopped,
         )
         # connection
         await self.wrtc.connect(chat_id, call_data)
+
+    async def leave_call(
+        self,
+        chat_id: int
+    ) -> bool:
+        # check app connection
+        if not self.client.is_connected:
+            await self.client.connect()
+
+        call = (await self.client.invoke(GetFullChannel(
+            channel=await self.client.resolve_peer(chat_id)
+        ))).full_chat.call
+
+        if not call:
+            return False
+
+        r = await self.client.invoke(LeaveGroupCall(
+            call=call,
+            source=0,
+        ))
+        return None or r.updates
 
     async def run(self):
         await idle()

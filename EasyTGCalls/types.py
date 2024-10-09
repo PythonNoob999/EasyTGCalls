@@ -4,7 +4,8 @@ from ntgcalls import (
     VideoDescription,
     InputMode
 )
-from typing import Literal
+from typing import Literal, List
+from dataclasses import dataclass
 import os
 
 INPUT_MODE_MAP = {
@@ -13,8 +14,8 @@ INPUT_MODE_MAP = {
     "ffmpeg": InputMode.FFMPEG,
     "no_latenct": InputMode.NO_LATENCY
 }
-AUDIO_TO_PCM16L = (lambda path, sample_rate, channel_count: f"ffmpeg -i {path} -f s16le -ac {channel_count} -ar {sample_rate} pipe:1")
-REMOVE_VIDEO_AUDIO = (lambda path, fps, width, height: f"ffmpeg -i {path} -f rawvideo -r {fps} -pix_fmt yuv420p -vf scale={width}:{height} pipe:1")
+AUDIO_TO_PCM16L = (lambda path, sample_rate, channel_count, log_level="": f"ffmpeg -i {path} {log_level}-f s16le -ac {channel_count} -ar {sample_rate} pipe:1")
+REMOVE_VIDEO_AUDIO = (lambda path, fps, width, height, log_level="": f"ffmpeg -i {path} {log_level}-f rawvideo -r {fps} -pix_fmt yuv420p -vf scale={width}:{height} pipe:1")
 
 class Audio:
     def __init__(
@@ -23,7 +24,8 @@ class Audio:
         input_mode: Literal["file", "shell", "ffmpeg", "no_latency"] = "shell",
         sample_rate: int = 96000,
         bits_per_sample: int = 16,
-        channel_count: int = 2
+        channel_count: int = 2,
+        auto_shell_command: bool = True
     ):
         self.raw = media_path
         self.input_mode = input_mode
@@ -43,8 +45,12 @@ class Audio:
             self.path = self.raw
         
         elif input_mode == "shell":
-            # change voice format to PCM16L
-            self.path = AUDIO_TO_PCM16L(self.raw, f"{(str(self.sample_rate//1000)+'k') if self.sample_rate >= 1000 else (str(self.sample_rate))}",self.channel_count)
+
+            if auto_shell_command:
+                # change voice format to PCM16L
+                self.path = AUDIO_TO_PCM16L(self.raw, f"{(str(self.sample_rate//1000)+'k') if self.sample_rate >= 1000 else (str(self.sample_rate))}",self.channel_count)
+            else:
+                self.path = self.raw
 
         else:
             self.path = self.raw
@@ -65,7 +71,8 @@ class Video:
         input_mode: Literal["file", "shell", "ffmpeg", "no_latency"] = "shell",
         width: int = 1280,
         height: int = 720,
-        fps: int = 30
+        fps: int = 30,
+        auto_shell_command: bool = True
     ):
         self.raw = media_path
         self.input_mode = input_mode
@@ -81,7 +88,10 @@ class Video:
             self.path = self.raw
         
         elif input_mode == "shell":
-            self.path = REMOVE_VIDEO_AUDIO(self.raw, self.fps, self.width, self.height)
+            if auto_shell_command:
+                self.path = REMOVE_VIDEO_AUDIO(self.raw, self.fps, self.width, self.height)
+            else:
+                self.path = self.raw
         
         else:
             self.path = self.raw
@@ -99,20 +109,30 @@ class Media:
     def __init__(
         self,
         audio: Audio = None,
-        video: Video = None
+        video: Video = None,
+        overwrite_audio: bool = True
     ) -> None:
         self.audio: Audio = audio
         self.video: Video = video
+        self.overwrite = overwrite_audio
 
     def __call__(self) -> MediaDescription:
         # overwrite video audio
         if self.video:
-            if self.audio:
+            if self.audio and self.overwrite:
                 self.audio.path = self.audio.path.replace(self.audio.raw, self.video.raw)
-            else:
+            elif not self.audio and self.overwrite:
                 self.audio = Audio(media_path=self.video.raw)
+            else:
+                pass
 
         return MediaDescription(
             audio=None if not self.audio else self.audio(),
             video=None if not self.video else self.video()
         )
+
+@dataclass
+class VoiceMediaState:
+    muted: bool
+    video_paused: bool
+    video_stopped: bool
