@@ -1,9 +1,9 @@
 from pyrogram import Client, idle
-from pyrogram.raw.functions.channels import GetFullChannel
-from pyrogram.raw.functions.phone import JoinGroupCall, LeaveGroupCall, GetGroupCall
 from pyrogram.raw.types import UpdateGroupCallConnection, Updates, DataJSON, GroupCall
 from ntgcalls import NTgCalls, MediaDescription
 from typing import Union
+
+from EasyTGCalls.pyro_client import Pyro
 from EasyTGCalls.types import Media
 from EasyTGCalls.stream_methods import StreamMethods
 
@@ -14,7 +14,7 @@ class Caller(StreamMethods):
         wrtc: NTgCalls = None
     ):
         self.wrtc = wrtc or NTgCalls()
-        self.client = pyro_client
+        self.client = Pyro(pyro_client)
 
     # raw methods
     
@@ -37,21 +37,12 @@ class Caller(StreamMethods):
         muted: bool,
         video_stopped: bool
     ):
-        chat = await self.client.resolve_peer(chat_id)
-        app_peer = await self.client.resolve_peer((await self.client.get_me()).id)
-        input_call = (await self.client.invoke(
-            GetFullChannel(
-                channel=chat
-            )
-        )).full_chat.call
-        result: Updates = await self.client.invoke(
-            JoinGroupCall(
-                call=input_call,
-                join_as=app_peer,
-                video_stopped=video_stopped,
-                muted=muted,
-                params=DataJSON(data=call_params)
-            ), sleep_threshold=0, retries=0
+        input_call = (await self.client.get_full_channel(chat_id)).full_chat.call
+        result: Updates = await self.client.join_group_call(
+            call=input_call,
+            video_stopped=video_stopped,
+            muted=muted,
+            params=DataJSON(call_params)
         )
 
         for update in result.updates:
@@ -63,24 +54,11 @@ class Caller(StreamMethods):
     async def get_call(
         self,
         chat_id
-    ) -> Union[bool, GroupCall]:
-        # check app connection
-        if not self.client.is_connected:
-            await self.client.connect()
+    ) -> Union[None, GroupCall]:
+        call = (await self.client.get_full_channel(chat_id)).full_chat.call
 
-        call = (await self.client.invoke(GetFullChannel(
-            channel=await self.client.resolve_peer(chat_id)
-        ))).full_chat.call
-
-        if not call:
-            return False
-
-        call = (await self.client.invoke(GetGroupCall(
-            call=call,
-            limit=-1
-        )))
-
-        return call
+        if call:
+            return await self.client.get_group_call(call)
             
     async def join_call(
         self: "Caller",
@@ -89,10 +67,6 @@ class Caller(StreamMethods):
         muted: bool = True,
         video_stopped: bool = True,
     ):
-        # check app connection
-        if not self.client.is_connected:
-            await self.client.connect()
-
         # check media
         if media.video:
             video_stopped = False
@@ -115,22 +89,12 @@ class Caller(StreamMethods):
         self,
         chat_id: int
     ) -> bool:
-        # check app connection
-        if not self.client.is_connected:
-            await self.client.connect()
+        call = (await self.client.get_full_channel(chat_id)).full_chat.call
 
-        call = (await self.client.invoke(GetFullChannel(
-            channel=await self.client.resolve_peer(chat_id)
-        ))).full_chat.call
-
-        if not call:
-            return False
-
-        r = await self.client.invoke(LeaveGroupCall(
-            call=call,
-            source=0,
-        ))
-        return None or r.updates
+        if call:
+            return await self.client.leave_group_call(
+                call=call,
+            )
 
     async def run(self):
         await idle()

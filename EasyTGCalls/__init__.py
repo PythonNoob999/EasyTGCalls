@@ -7,4 +7,5 @@ from .types import (
     REMOVE_VIDEO_AUDIO,
     AUDIO_TO_PCM16L
 )
+from .pyro_client import Pyro
 from .utils import youtube_video

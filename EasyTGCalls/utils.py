@@ -4,6 +4,8 @@ import asyncio
 
 async def youtube_video(
     url,
+    quality: str = None,
+    audio_only: bool = False,
     sample_rate = 96000,
     channel_count = 2,
     bits_per_sample = 16,
@@ -11,11 +13,16 @@ async def youtube_video(
     h = 1080,
     fps = 60,
 ) -> Media:
+    if not audio_only:
+        format = "bestvideo+bestaudio/best" if not quality else f"bv[height<={quality}]+ba/best[height<={quality}]"
+    else:
+        format = "bestaudio/best" if not quality else f"ba/best[height<={quality}]"
+
     process = await asyncio.create_subprocess_exec(
         "yt-dlp",
         "-g",
         "-f",
-        "bestvideo+bestaudio/best",
+        format,
         url,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
@@ -27,7 +34,7 @@ async def youtube_video(
     return Media(
         audio=Audio(
             media_path=AUDIO_TO_PCM16L(
-                path=audio,
+                path=audio if not audio_only else video,
                 sample_rate=sample_rate,
                 channel_count=channel_count,
                 log_level="-loglevel panic "
@@ -37,7 +44,7 @@ async def youtube_video(
             bits_per_sample=bits_per_sample,
             auto_shell_command=False
         ),
-        video=Video(
+        video=None if audio_only else Video(
             media_path=REMOVE_VIDEO_AUDIO(
                 path=video,
                 width=w,
